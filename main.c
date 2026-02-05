@@ -78,7 +78,9 @@ volatile bool button_D = false;
 
 uint16_t adc_value = 0;
 int voltage_24v = 0;
+//flag_block существует, дабы разделить блокировку кнопки и напряжения
 bool flag_block = false;
+bool adc_ready = false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -208,12 +210,10 @@ int main(void)
 		}
 
 		// Battery voltage, STOP WARNING
-		adc_value = Get_ADC();
-
-		if(adc_value != 0xFFFF && adc_value <= 4095)
+		if(adc_ready)
 		{
+			adc_ready = false;
 			//Значение напряжения в 100 раз больше, чем должно быть, сделано чтобы не использовать дробные числа
-			voltage_24v = (adc_value * 111 * 33) / 4095;
 			if (voltage_24v<2000){ //На самом деле 20V
 				motor_state = MotorMashineState_BLOCKED;
 				flag_block = false;
@@ -329,7 +329,7 @@ static void MX_ADC_Init(void)
   hadc.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc.Init.LowPowerAutoWait = DISABLE;
   hadc.Init.LowPowerAutoPowerOff = DISABLE;
-  hadc.Init.ContinuousConvMode = DISABLE;
+  hadc.Init.ContinuousConvMode = ENABLE;
   hadc.Init.DiscontinuousConvMode = DISABLE;
   hadc.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
@@ -344,13 +344,15 @@ static void MX_ADC_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = ADC_RANK_CHANNEL_NUMBER;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_239CYCLES_5;
   if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
   {
     Error_Handler();
   }
   /* USER CODE BEGIN ADC_Init 2 */
-
+  HAL_NVIC_SetPriority(ADC1_COMP_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(ADC1_COMP_IRQn);
+  HAL_ADC_Start_IT(&hadc);
   /* USER CODE END ADC_Init 2 */
 
 }
@@ -377,12 +379,6 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : PA3 */
   GPIO_InitStruct.Pin = GPIO_PIN_3;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PA1 */
-  GPIO_InitStruct.Pin = GPIO_PIN_1;
-  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
@@ -417,21 +413,21 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-uint16_t Get_ADC(void)
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-    uint16_t value = 0;
+    static uint16_t counter = 0;
+    HAL_ADC_Stop(hadc);
+    //Sampling time 239
+    if(++counter >= 269) {
+       counter = 0;
+       adc_value = HAL_ADC_GetValue(hadc);
+       adc_ready = true;
 
-    HAL_ADC_Start(&hadc);
-    if(HAL_ADC_PollForConversion(&hadc, 100) == HAL_OK)
-    {
-        value = HAL_ADC_GetValue(&hadc);
+       if(adc_value != 0xFFFF && adc_value <= 4095) {
+    	   voltage_24v = (adc_value * 111 * 33) / 4095;
+       }
     }
-    else
-    {
-        value = 0xFFFF;
-    }
-    HAL_ADC_Stop(&hadc);
-    return value;
+    HAL_ADC_Start_IT(hadc);
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
