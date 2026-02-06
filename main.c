@@ -350,8 +350,8 @@ static void MX_ADC_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN ADC_Init 2 */
-  HAL_NVIC_SetPriority(ADC1_COMP_IRQn, 1, 0);
-  HAL_NVIC_EnableIRQ(ADC1_COMP_IRQn);
+  HAL_NVIC_SetPriority(ADC1_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(ADC1_IRQn);
   HAL_ADC_Start_IT(&hadc);
   /* USER CODE END ADC_Init 2 */
 
@@ -415,19 +415,12 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-    static uint16_t counter = 0;
-    HAL_ADC_Stop(hadc);
-    //Sampling time 239
-    if(++counter >= 269) {
-       counter = 0;
-       adc_value = HAL_ADC_GetValue(hadc);
-       adc_ready = true;
+	adc_value = HAL_ADC_GetValue(hadc);
+	adc_ready = true;
 
-       if(adc_value != 0xFFFF && adc_value <= 4095) {
-    	   voltage_24v = (adc_value * 111 * 33) / 4095;
-       }
-    }
-    HAL_ADC_Start_IT(hadc);
+	if(adc_value != 0xFFFF && adc_value <= 4095) {
+		voltage_24v = (adc_value * 110 * 33) / 4095;
+	}
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
