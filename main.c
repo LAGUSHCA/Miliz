@@ -145,8 +145,10 @@ int main(void)
 				case MotorMashineState_OFF:
 					switch(button)
 					{
-						case Button_TOP:
 						case Button_C:
+							motor_state = MotorMashineState_ON;
+							break;
+						case Button_TOP:
 						case Button_D:
 							motor_state = MotorMashineState_BLOCKED;
 							flag_block = true;
@@ -192,21 +194,22 @@ int main(void)
 			state_changed = 0;
 			button = Button_EMPTY;
 		}
-		else // Sync control (Raspberry Pi)
+
+		// Сontrol (Raspberry Pi)
+		switch(motor_state)
 		{
-			switch(motor_state)
-			{
-				case MotorMashineState_ON:
-					if((HAL_GPIO_ReadPin(GPIOA,RP0_Pin)!=GPIO_PIN_SET) || (HAL_GPIO_ReadPin(GPIOA,RP1_Pin)!=GPIO_PIN_RESET))
-						motor_state = MotorMashineState_OFF;
-					break;
-				case MotorMashineState_OFF:
-					if((HAL_GPIO_ReadPin(GPIOA,RP0_Pin)==GPIO_PIN_SET) && (HAL_GPIO_ReadPin(GPIOA,RP1_Pin)==GPIO_PIN_RESET))
-						motor_state = MotorMashineState_ON;
-					break;
-				case MotorMashineState_BLOCKED:
-					break;
-			}
+			case MotorMashineState_ON:
+				if((HAL_GPIO_ReadPin(GPIOA,RP0_Pin)!=GPIO_PIN_SET) || (HAL_GPIO_ReadPin(GPIOA,RP1_Pin)!=GPIO_PIN_RESET))
+					motor_state = MotorMashineState_OFF;
+				break;
+			case MotorMashineState_OFF:
+				if((HAL_GPIO_ReadPin(GPIOA,RP0_Pin)==GPIO_PIN_SET) && (HAL_GPIO_ReadPin(GPIOA,RP1_Pin)==GPIO_PIN_RESET))
+					motor_state = MotorMashineState_ON;
+				break;
+			case MotorMashineState_BLOCKED:
+				if(flag_block == true && (HAL_GPIO_ReadPin(GPIOA,RP0_Pin)==GPIO_PIN_SET) && (HAL_GPIO_ReadPin(GPIOA,RP1_Pin)==GPIO_PIN_RESET))
+					motor_state = MotorMashineState_ON;
+				break;
 		}
 
 		// Battery voltage, STOP WARNING
